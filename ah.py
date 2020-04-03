@@ -31,6 +31,11 @@ import json
 import pygame as pg
 import ptext
 import sys
+try:
+    import android
+    import android.storage
+except:
+    android=None
 
 from constants import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, TITLE_SCREEN, GAME, GAME_OVER, GAME_COUNTDOWN, GAME_AREA, BLACK, \
     AMBER, FONT_NAME, SONGS, GAME_OVER_SONG, HIGH_SCORES, HIGHSCORE_SCROLL_TOP_Y, HIGHSCORE_SCROLL_HEIGHT
@@ -41,6 +46,10 @@ pg.display.set_icon(pg.image.load("gfx/window-icon.png"))
 screen = pg.display.set_mode(
     (SCREEN_WIDTH, SCREEN_HEIGHT), pg.FULLSCREEN | pg.SCALED
 )
+screen.fill(0)
+screen.blit(pg.image.load("gfx/window-icon.png"), (0,0))
+pg.display.flip()
+
 
 ptext.DEFAULT_FONT_NAME = FONT_NAME
 
@@ -221,6 +230,8 @@ class Game:
 
     def load_highscores(self):
         highscore_file = os.path.join(os.path.expanduser('~'), 'Saved Games', 'AH Game', "highscore.json")
+        if android:
+            highscore_file = os.path.join(android.storage.app_storage_path(), "Saved Games",  "highscore.json")
         if not os.path.isfile(highscore_file):
             self.save_highscores()
         with open(highscore_file, "rt") as f:
@@ -229,7 +240,11 @@ class Game:
 
     def save_highscores(self):
         save_path = os.path.join(os.path.expanduser('~'), 'Saved Games', 'AH Game')
+        if android:
+            save_path = os.path.join(android.storage.app_storage_path(), "Saved Games")
         save_file = os.path.join(save_path, "highscore.json")
+        
+            
         os.makedirs(save_path, exist_ok=True)
         with open(save_file, "wt+") as f:
             f.write(json.dumps(self.high_scores, indent=4))
@@ -314,6 +329,7 @@ class Game:
         context.speed = 0.0
         context.old_speed = 0.0
         context.dst_vec = pg.Vector2()
+        pg.key.stop_text_input()
         return context
 
     def game_event(self, context, event):
@@ -435,7 +451,8 @@ class Game:
 
         if not context.is_high_score:
             self.gameover_highscores(context)
-
+        else:
+            pg.key.start_text_input()
         return context
 
     def gameover_highscores(self, context):
@@ -481,6 +498,7 @@ class Game:
                 context.high_score_name = context.high_score_name[:-1]
                 return
             if event.key == pg.K_RETURN:
+                pg.key.stop_text_input()
                 self.high_scores.append((context.score, context.high_score_name))
                 self.high_scores.sort(key=lambda x: x[0], reverse=True)
                 self.high_scores = self.high_scores[:-1]
@@ -488,8 +506,10 @@ class Game:
                 self.save_highscores()
                 self.gameover_highscores(context)
                 return
-            if event.unicode.isalnum() and len(context.high_score_name) < 8:
-                context.high_score_name += event.unicode.upper()
+            # if event.unicode.isalnum() and len(context.high_score_name) < 8:
+            #     context.high_score_name += event.unicode.upper()
+        if context.is_high_score and event.type == pg.TEXTINPUT:
+            context.high_score_name += event.text
 
     def gameover_update(self, context, delta_time):
         context.count -= delta_time
